@@ -8,6 +8,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
+	"math"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -155,7 +156,7 @@ func GenerateKeyToFile(bits int, format KeyFormat, path string) (err error) {
 	return os.WriteFile(filepath.Join(path, PublicKeyFileName), []byte(pubKey), 0644)
 }
 
-// PublicKeyEncrypt 公钥加密
+// PublicKeyEncrypt use public key encryption
 func PublicKeyEncrypt(publicKey, data []byte) ([]byte, error) {
 	pkAny, err := x509.ParsePKIXPublicKey(publicKey)
 	if err != nil {
@@ -165,10 +166,11 @@ func PublicKeyEncrypt(publicKey, data []byte) ([]byte, error) {
 	if !ok {
 		return nil, errors.New("public key error")
 	}
-	return rsa.EncryptPKCS1v15(rand.Reader, pk, data)
+
+	return EncryptByPublicKey(pk, data)
 }
 
-// PrivateKeyEncrypt 私钥加密
+// PrivateKeyEncrypt use private key encryption
 func PrivateKeyEncrypt(privateKey, data []byte) ([]byte, error) {
 	pkAny, err := x509.ParsePKCS8PrivateKey(privateKey)
 	if err != nil {
@@ -178,10 +180,10 @@ func PrivateKeyEncrypt(privateKey, data []byte) ([]byte, error) {
 	if !ok {
 		return nil, errors.New("private key error")
 	}
-	return rsa.SignPKCS1v15(rand.Reader, pk, 0, data)
+	return EncryptByPrivateKey(pk, data)
 }
 
-// PrivateKeyDecrypt 私钥解密
+// PrivateKeyDecrypt use private key decryption
 func PrivateKeyDecrypt(privateKey, data []byte) ([]byte, error) {
 	pkAny, err := x509.ParsePKCS8PrivateKey(privateKey)
 	if err != nil {
@@ -191,10 +193,10 @@ func PrivateKeyDecrypt(privateKey, data []byte) ([]byte, error) {
 	if !ok {
 		return nil, errors.New("private key error")
 	}
-	return rsa.DecryptPKCS1v15(rand.Reader, pk, data)
+	return DecryptByPrivateKey(pk, data)
 }
 
-// PublicKeyDecrypt 公钥解密
+// PublicKeyDecrypt use public key decryption
 func PublicKeyDecrypt(publicKey, data []byte) ([]byte, error) {
 	pkAny, err := x509.ParsePKIXPublicKey(publicKey)
 	if err != nil {
@@ -204,27 +206,83 @@ func PublicKeyDecrypt(publicKey, data []byte) ([]byte, error) {
 	if !ok {
 		return nil, errors.New("public key error")
 	}
-	return publicKeyDecrypt(pk, 0, nil, data)
+	return DecryptByPublicKey(pk, data)
 }
 
 // EncryptByPrivateKey alias rsa.SignPKCS1v15
 func EncryptByPrivateKey(pk *rsa.PrivateKey, data []byte) ([]byte, error) {
-	return rsa.SignPKCS1v15(rand.Reader, pk, 0, data)
+	if len(data)+11 <= pk.Size() {
+		return rsa.SignPKCS1v15(rand.Reader, pk, 0, data)
+	}
+
+	bs := bytesSplit(data, pk.Size()-11)
+	ciphertext := make([]byte, 0, len(bs)*pk.Size())
+	for i, _ := range bs {
+		if tmp, err := rsa.SignPKCS1v15(rand.Reader, pk, 0, bs[i]); err != nil {
+			return nil, err
+		} else {
+			ciphertext = append(ciphertext, tmp...)
+		}
+	}
+
+	return ciphertext, nil
 }
 
 // EncryptByPublicKey alias rsa.EncryptPKCS1v15
 func EncryptByPublicKey(pk *rsa.PublicKey, data []byte) ([]byte, error) {
-	return rsa.EncryptPKCS1v15(rand.Reader, pk, data)
+	if len(data)+11 <= pk.Size() {
+		return rsa.EncryptPKCS1v15(rand.Reader, pk, data)
+	}
+
+	bs := bytesSplit(data, pk.Size()-11)
+	ciphertext := make([]byte, 0, len(bs)*pk.Size())
+	for i, _ := range bs {
+		if tmp, err := rsa.EncryptPKCS1v15(rand.Reader, pk, bs[i]); err != nil {
+			return nil, err
+		} else {
+			ciphertext = append(ciphertext, tmp...)
+		}
+	}
+
+	return ciphertext, nil
 }
 
 // DecryptByPrivateKey alias rsa.DecryptPKCS1v15
 func DecryptByPrivateKey(pk *rsa.PrivateKey, data []byte) ([]byte, error) {
-	return rsa.DecryptPKCS1v15(rand.Reader, pk, data)
+	if len(data) <= pk.Size() {
+		return rsa.DecryptPKCS1v15(rand.Reader, pk, data)
+	}
+
+	bs := bytesSplit(data, pk.Size())
+	plaintext := make([]byte, 0, len(bs)*pk.Size())
+	for i, _ := range bs {
+		if tmp, err := rsa.DecryptPKCS1v15(rand.Reader, pk, bs[i]); err != nil {
+			return nil, err
+		} else {
+			plaintext = append(plaintext, tmp...)
+		}
+	}
+
+	return plaintext, nil
 }
 
 // DecryptByPublicKey decrypt by public key
 func DecryptByPublicKey(pk *rsa.PublicKey, data []byte) ([]byte, error) {
-	return publicKeyDecrypt(pk, 0, nil, data)
+	if len(data) <= pk.Size() {
+		return publicKeyDecrypt(pk, 0, nil, data)
+	}
+
+	bs := bytesSplit(data, pk.Size())
+	plaintext := make([]byte, 0, len(bs)*pk.Size())
+	for i, _ := range bs {
+		if tmp, err := publicKeyDecrypt(pk, 0, nil, bs[i]); err != nil {
+			return nil, err
+		} else {
+			plaintext = append(plaintext, tmp...)
+		}
+	}
+
+	return plaintext, nil
 }
 
 // --------------------------------------------------
@@ -317,7 +375,7 @@ func unPadding(input []byte) (out []byte) {
 	return
 }
 
-// publicKeyDecrypt 公钥解密
+// publicKeyDecrypt
 func publicKeyDecrypt(pub *rsa.PublicKey, hash crypto.Hash, hashed []byte, sign []byte) (out []byte, err error) {
 	hashLen, prefix, err := pkcs1v15HashInfo(hash, len(hashed))
 	if err != nil {
@@ -336,5 +394,26 @@ func publicKeyDecrypt(pub *rsa.PublicKey, hash crypto.Hash, hashed []byte, sign 
 	out = unPadding(em)
 
 	err = nil
+	return
+}
+
+// bytesSplit split the data according to the specified length
+func bytesSplit(data []byte, partLen int) (result [][]byte) {
+	dataLen := len(data)
+	if dataLen <= partLen || partLen <= 0 {
+		result = append(result, data)
+		return
+	}
+	// split
+	times := int(math.Ceil(float64(dataLen) / float64(partLen)))
+	var left, right int
+	for i := 0; i < times; i++ {
+		right = (i + 1) * partLen
+		if right > dataLen {
+			right = dataLen
+		}
+		result = append(result, data[left:right])
+		left += partLen
+	}
 	return
 }
