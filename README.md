@@ -5,4 +5,4 @@
 - [x] RSA
 - [ ] AES
 - [x] MD5
-- [ ] SHA256
+- [x] SHA256
