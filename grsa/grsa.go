@@ -84,16 +84,12 @@ func GenerateKeyToString(bits int, format KeyFormat) (privateKey string, publicK
 	return
 }
 
-// GetPrivateKeyFromStr parse private key from string
-func GetPrivateKeyFromStr(s string) (privateKey *rsa.PrivateKey, err error) {
-	block, _ := pem.Decode([]byte(s))
-	if block == nil {
-		return nil, PrivateKeyErr
-	}
-	if privateKey, err = x509.ParsePKCS1PrivateKey(block.Bytes); err == nil {
+// GetPrivateKey parse private key from byte slice
+func GetPrivateKey(bs []byte) (privateKey *rsa.PrivateKey, err error) {
+	if privateKey, err = x509.ParsePKCS1PrivateKey(bs); err == nil {
 		return
 	}
-	pkAny, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+	pkAny, err := x509.ParsePKCS8PrivateKey(bs)
 	if err != nil {
 		return
 	}
@@ -102,6 +98,15 @@ func GetPrivateKeyFromStr(s string) (privateKey *rsa.PrivateKey, err error) {
 		return nil, PrivateKeyErr
 	}
 	return
+}
+
+// GetPrivateKeyFromStr parse private key from string
+func GetPrivateKeyFromStr(s string) (privateKey *rsa.PrivateKey, err error) {
+	block, _ := pem.Decode([]byte(s))
+	if block == nil {
+		return nil, PrivateKeyErr
+	}
+	return GetPrivateKey(block.Bytes)
 }
 
 // GetPrivateKeyFromFile parse private key from file
@@ -114,13 +119,9 @@ func GetPrivateKeyFromFile(fileName string) (privateKey *rsa.PrivateKey, err err
 	return GetPrivateKeyFromStr(string(fb))
 }
 
-// GetPublicKeyFromStr parse public key from string
-func GetPublicKeyFromStr(s string) (publicKey *rsa.PublicKey, err error) {
-	block, _ := pem.Decode([]byte(s))
-	if block == nil {
-		return nil, PrivateKeyErr
-	}
-	pkAny, err := x509.ParsePKIXPublicKey(block.Bytes)
+// GetPublicKey parse public key from byte slice
+func GetPublicKey(bs []byte) (publicKey *rsa.PublicKey, err error) {
+	pkAny, err := x509.ParsePKIXPublicKey(bs)
 	if err != nil {
 		return
 	}
@@ -129,6 +130,15 @@ func GetPublicKeyFromStr(s string) (publicKey *rsa.PublicKey, err error) {
 		return nil, PublicKeyErr
 	}
 	return
+}
+
+// GetPublicKeyFromStr parse public key from string
+func GetPublicKeyFromStr(s string) (publicKey *rsa.PublicKey, err error) {
+	block, _ := pem.Decode([]byte(s))
+	if block == nil {
+		return nil, PrivateKeyErr
+	}
+	return GetPublicKey(block.Bytes)
 }
 
 // GetPublicKeyFromFile parse public key from file
@@ -283,6 +293,16 @@ func DecryptByPublicKey(pk *rsa.PublicKey, data []byte) ([]byte, error) {
 	}
 
 	return plaintext, nil
+}
+
+// PrivateKeyToStr private key byte slice to string
+func PrivateKeyToStr(bs []byte) (string, error) {
+	return keyToString(bs, privateBlockType)
+}
+
+// PublicKeyToStr public key byte slice to string
+func PublicKeyToStr(bs []byte) (string, error) {
+	return keyToString(bs, publicBlockType)
 }
 
 // --------------------------------------------------
