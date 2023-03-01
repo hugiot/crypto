@@ -53,10 +53,10 @@ package main
 import "github.com/hugiot/crypto/grsa"
 
 func main() {
-	//rsaPrivateKey, _ := grsa.GetPrivateKeyFromStr("")
-	//rsaPublicKey, _ := grsa.GetPublicKeyFromFile("")
-	rsaPrivateKey, _ := grsa.GetPrivateKeyFromFile("./private.key")
-	rsaPublicKey, _ := grsa.GetPublicKeyFromFile("./Public.key")
+	//rsaPrivateKey, _ := grsa.ResolvePrivateKeyFromStr("")
+	//rsaPublicKey, _ := grsa.ResolvePublicKeyFromFile("")
+	rsaPrivateKey, _ := grsa.ResolvePrivateKeyFromFile("./private.key")
+	rsaPublicKey, _ := grsa.ResolvePublicKeyFromFile("./Public.key")
 }
 ```
 
@@ -69,10 +69,10 @@ import "github.com/hugiot/crypto/grsa"
 
 func main() {
 	// use private key
-	privateKey, _ := grsa.GetPrivateKeyFromFile(grsa.PrivateKeyFileName)
+	privateKey, _ := grsa.ResolvePrivateKeyFromFile(grsa.PrivateKeyFileName)
 	ciphertext, _ := grsa.EncryptByPrivateKey(privateKey, []byte("this is content"))
 	// use public key
-	publicKey, _ := grsa.GetPublicKeyFromFile(grsa.PublicKeyFileName)
+	publicKey, _ := grsa.ResolvePublicKeyFromFile(grsa.PublicKeyFileName)
 	ciphertext, _ := grsa.EncryptByPublicKey(publicKey, []byte("this is content"))
 }
 ```
@@ -86,10 +86,10 @@ import "github.com/hugiot/crypto/grsa"
 
 func main() {
 	// use private key
-	privateKey, _ := grsa.GetPrivateKeyFromFile(grsa.PrivateKeyFileName)
+	privateKey, _ := grsa.ResolvePrivateKeyFromFile(grsa.PrivateKeyFileName)
 	plaintext, _ := grsa.DecryptByPrivateKey(privateKey, []byte("xxx"))
 	// use public key
-	publicKey, _ := grsa.GetPublicKeyFromFile(grsa.PublicKeyFileName)
+	publicKey, _ := grsa.ResolvePublicKeyFromFile(grsa.PublicKeyFileName)
 	plaintext, _ := grsa.DecryptByPublicKey(publicKey, []byte("xxx"))
 }
 ```
